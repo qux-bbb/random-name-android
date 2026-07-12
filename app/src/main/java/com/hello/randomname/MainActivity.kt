@@ -8,6 +8,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import kotlin.random.Random
 
 class MainActivity : AppCompatActivity() {
 
@@ -78,7 +79,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun randomName(): String {
         val surname = surnames.random()
-        val givenLength = if (Math.random() > 0.5) 2 else 1
+        val givenLength = if (Random.nextBoolean()) 2 else 1
         val given = (1..givenLength).joinToString("") { givenChars.random() }
         return "$surname:$given"
     }
