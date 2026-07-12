@@ -96,6 +96,16 @@ class MainActivity : AppCompatActivity() {
         btnGenerate.setOnClickListener {
             generateAndDisplayName()
         }
+
+        tvLastName.setOnClickListener {
+            val text = tvLastName.text.toString()
+            if (text.isNotBlank() && text != getString(R.string.name_list_init)) {
+                val clipboard = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                val clip = android.content.ClipData.newPlainText("姓名", text)
+                clipboard.setPrimaryClip(clip)
+                Toast.makeText(this, "已复制：$text", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun ensureLibraryFiles() {
