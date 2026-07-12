@@ -40,12 +40,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    companion object {
+        private val WHITESPACE_REGEX = Regex("\\s+")
+    }
+
     private fun loadWords(fileName: String): Array<String> {
         return try {
             val inputStream = assets.open(fileName)
             val reader = BufferedReader(InputStreamReader(inputStream, Charsets.UTF_8))
             val text = reader.readText()
-            text.trim().split("\\s+".toRegex()).filter { it.isNotBlank() }.toTypedArray()
+            text.trim().split(WHITESPACE_REGEX).filter { it.isNotBlank() }.toTypedArray()
         } catch (e: Exception) {
             e.printStackTrace()
             emptyArray()
