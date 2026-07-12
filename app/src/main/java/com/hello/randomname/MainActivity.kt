@@ -36,10 +36,12 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var libDir: File
     private var fileList: List<String> = emptyList()
+    private lateinit var prefs: android.content.SharedPreferences
 
     companion object {
         private val WHITESPACE_REGEX = Regex("\\s+")
         private const val LIB_DIR_NAME = "ming_library"
+        private const val PREF_DEFAULT_FILE = "default_ming_file"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,6 +56,8 @@ class MainActivity : AppCompatActivity() {
         spMingFile = findViewById(R.id.spMingFile)
 
         libDir = File(filesDir, LIB_DIR_NAME)
+        prefs = getSharedPreferences("random_name_prefs", MODE_PRIVATE)
+        currentFileName = prefs.getString(PREF_DEFAULT_FILE, "ming_通用.txt") ?: "ming_通用.txt"
         ensureLibraryFiles()
 
         // 从内部存储加载姓氏词库
@@ -120,6 +124,7 @@ class MainActivity : AppCompatActivity() {
                 val selectedFile = fileList[position]
                 if (selectedFile != currentFileName) {
                     currentFileName = selectedFile
+                    prefs.edit().putString(PREF_DEFAULT_FILE, currentFileName).apply()
                     loadGivenChars(File(libDir, currentFileName).absolutePath)
                     resetNameList()
                 }
@@ -138,7 +143,10 @@ class MainActivity : AppCompatActivity() {
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spMingFile.adapter = adapter
 
-        // 恢复当前选中项
+        // 如果保存的默认文件不存在，回退到第一个可用项
+        if (currentFileName !in fileList) {
+            currentFileName = fileList.firstOrNull() ?: currentFileName
+        }
         val idx = fileList.indexOf(currentFileName).coerceAtLeast(0)
         spMingFile.setSelection(idx)
     }
