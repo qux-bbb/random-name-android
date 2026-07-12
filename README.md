@@ -15,7 +15,7 @@
 
 ## 截图
 
-_(待补充)_
+![主界面](fastlane/metadata/android/en-US/images/phoneScreenshots/screenshot1.png)
 
 ## 构建
 
