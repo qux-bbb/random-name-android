@@ -180,7 +180,14 @@ class MainActivity : AppCompatActivity() {
                     showFileOptionsDialog(files[which])
                 } else {
                     // 点击"导入文件"
-                    importLauncher.launch(arrayOf("text/plain", "*/*"))
+                    AlertDialog.Builder(this)
+                        .setTitle("导入名字库")
+                        .setMessage("选择 .txt 文件，格式要求：\n\n汉字之间用空格分隔\nUTF-8 编码\n\n例如：伟 强 芳 婷 娜")
+                        .setPositiveButton("选择文件") { _, _ ->
+                            importLauncher.launch(arrayOf("text/plain", "*/*"))
+                        }
+                        .setNegativeButton("取消", null)
+                        .show()
                 }
             }
             .setPositiveButton("新建") { _, _ -> showCreateDialog() }
