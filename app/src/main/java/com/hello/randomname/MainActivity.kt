@@ -2,7 +2,9 @@ package com.hello.randomname
 
 import android.app.AlertDialog
 import android.content.DialogInterface
+import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
@@ -11,6 +13,7 @@ import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
 import java.io.BufferedReader
@@ -37,6 +40,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var libDir: File
     private var fileList: List<String> = emptyList()
     private lateinit var prefs: android.content.SharedPreferences
+
+    private val importLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let { importFile(it) }
+    }
 
     companion object {
         private val WHITESPACE_REGEX = Regex("\\s+")
@@ -158,15 +165,24 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showManageDialog() {
-        val items = getMingFiles().map { name ->
+        val files = getMingFiles()
+        val items = files.map { name ->
             val file = File(libDir, name)
             val count = loadWordsCount(file.absolutePath)
             "${displayName(name)}（${count}字）"
-        }.toTypedArray()
+        } + "📥 导入文件"
 
         AlertDialog.Builder(this)
             .setTitle("管理名字库")
-            .setItems(items) { _: DialogInterface, _: Int -> /* 暂不开放点击编辑 */ }
+            .setItems(items.toTypedArray()) { _, which ->
+                if (which < files.size) {
+                    // 点击已有文件：显示操作选项
+                    showFileOptionsDialog(files[which])
+                } else {
+                    // 点击"导入文件"
+                    importLauncher.launch(arrayOf("text/plain", "*/*"))
+                }
+            }
             .setPositiveButton("新建") { _, _ -> showCreateDialog() }
             .setNeutralButton("删除") { _, _ -> showDeleteDialog() }
             .setNegativeButton("关闭", null)
@@ -255,6 +271,118 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ── 核心功能 ──
+
+    private fun showFileOptionsDialog(fileName: String) {
+        val display = displayName(fileName)
+        AlertDialog.Builder(this)
+            .setTitle(display)
+            .setItems(arrayOf("设为当前", "重命名", "删除")) { _, which ->
+                when (which) {
+                    0 -> { // 设为当前
+                        val idx = fileList.indexOf(fileName).coerceAtLeast(0)
+                        spMingFile.setSelection(idx)
+                    }
+                    1 -> showRenameDialog(fileName)  // 重命名
+                    2 -> { // 删除
+                        if (fileName == currentFileName) {
+                            Toast.makeText(this, "不能删除当前正在使用的文件", Toast.LENGTH_SHORT).show()
+                        } else {
+                            AlertDialog.Builder(this)
+                                .setTitle("确认删除")
+                                .setMessage("确定删除「${display}」？")
+                                .setPositiveButton("删除") { _, _ ->
+                                    File(libDir, fileName).delete()
+                                    refreshFileList()
+                                    Toast.makeText(this, "已删除", Toast.LENGTH_SHORT).show()
+                                }
+                                .setNegativeButton("取消", null)
+                                .show()
+                        }
+                    }
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun showRenameDialog(oldName: String) {
+        val input = EditText(this).apply {
+            hint = "新名称"
+            setText(displayName(oldName))
+            selectAll()
+            setPadding(48, 32, 48, 32)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("重命名")
+            .setView(input)
+            .setPositiveButton("确定") { _, _ ->
+                val newDisplay = input.text.toString().trim()
+                if (newDisplay.isEmpty()) return@setPositiveButton
+                val newName = "ming_$newDisplay.txt"
+                val oldFile = File(libDir, oldName)
+                val newFile = File(libDir, newName)
+                if (newFile.exists()) {
+                    Toast.makeText(this, "文件名已存在", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                oldFile.renameTo(newFile)
+                refreshFileList()
+                if (oldName == currentFileName) {
+                    currentFileName = newName
+                    prefs.edit().putString(PREF_DEFAULT_FILE, currentFileName).apply()
+                }
+                Toast.makeText(this, "已重命名", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun importFile(uri: Uri) {
+        try {
+            // 获取原始文件名
+            var fileName = "ming_导入.txt"
+            contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex >= 0) {
+                        fileName = cursor.getString(nameIndex) ?: "导入.txt"
+                        if (!fileName.startsWith("ming_")) {
+                            fileName = "ming_$fileName"
+                        }
+                        if (!fileName.endsWith(".txt")) {
+                            fileName += ".txt"
+                        }
+                    }
+                }
+            }
+
+            // 检查重名
+            val targetFile = File(libDir, fileName)
+            if (targetFile.exists()) {
+                runOnUiThread {
+                    Toast.makeText(this, "「${displayName(fileName)}」已存在", Toast.LENGTH_SHORT).show()
+                }
+                return
+            }
+
+            // 复制内容
+            contentResolver.openInputStream(uri)?.use { input ->
+                targetFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+
+            runOnUiThread {
+                refreshFileList()
+                Toast.makeText(this, "已导入「${displayName(fileName)}」", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            runOnUiThread {
+                Toast.makeText(this, "导入失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     private fun loadGivenChars(filePath: String) {
         givenChars = loadWordsFromPath(filePath)
