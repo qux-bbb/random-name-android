@@ -49,6 +49,8 @@ class MainActivity : AppCompatActivity() {
         private val WHITESPACE_REGEX = Regex("\\s+")
         private const val LIB_DIR_NAME = "ming_library"
         private const val PREF_DEFAULT_FILE = "default_ming_file"
+        // 固定显示顺序：通用 → 男 → 女 → 原始，其余按拼音排后面
+        private val FILE_ORDER = listOf("通用", "男", "女", "原始")
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -109,13 +111,20 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** 列出内部存储中所有 ming_ 开头的文件 */
+    /** 列出内部存储中所有 ming_ 开头的文件，按固定顺序 + 其余按拼音 */
     private fun getMingFiles(): List<String> {
-        return libDir.listFiles()
+        val all = libDir.listFiles()
             ?.filter { it.name.startsWith("ming_") && it.name.endsWith(".txt") }
             ?.map { it.name }
-            ?.sorted()
             ?: emptyList()
+
+        val (fixed, rest) = all.partition { name ->
+            val display = displayName(name)
+            display in FILE_ORDER
+        }
+        val fixedSorted = fixed.sortedBy { FILE_ORDER.indexOf(displayName(it)) }
+        val restSorted = rest.sorted()
+        return fixedSorted + restSorted
     }
 
     /** 从文件名提取显示名（ming_通用.txt → 通用） */
